@@ -1,0 +1,61 @@
+	load_file("nrngui.hoc")		//starting graphical user interface
+	
+	//setting the STDP-BCM parameters - used later in the code
+
+	P0_BCMTHRESHOLD=0.003	
+	D0_BCMTHRESHOLD=0.001
+	SCOUNT0_BCMTHRESHOLD = 1/62.5
+	SCOUNTTAU_BCMTHRESHOLD = 1500	// (ms) averaging time constant for postsynaptic spike count
+	printf("Time constant for the weighted spike count = %e min\n", SCOUNTTAU_BCMTHRESHOLD/1000/60)
+	ALPHA_BCMTHRESHOLD = 62.5		// scaling constant, ALPHA=0 for non-BCM model
+	BCMSLOW_BCMTHRESHOLD = 0		// Cliff's slowing of BCM rate, 0=no change, 0.5=50% slowing, 0.2=20% slowing etc
+	printf("ALPHA_BCMTHRESHOLD = %e\n", ALPHA_BCMTHRESHOLD)	
+	PTAU = 20
+	DTAU = 70	
+	
+	////////////Global BCM spike counter and d & p calculator//////////////////////////////
+	create cell	//creating single compartment
+	objref bcm
+	
+	cell {
+	diam = 10	//diameter
+	L = 10		//length
+	insert hh	//making cell active
+	objref bcm
+	bcm = new BCMthreshold(.5)	//inserting BCM mechanism
+	p0_BCMthreshold=P0_BCMTHRESHOLD	
+	d0_BCMthreshold=D0_BCMTHRESHOLD
+	scount0_BCMthreshold = SCOUNT0_BCMTHRESHOLD
+	scounttau_BCMthreshold = SCOUNTTAU_BCMTHRESHOLD
+	alpha_BCMthreshold = ALPHA_BCMTHRESHOLD	
+	bcmslow_BCMthreshold = BCMSLOW_BCMTHRESHOLD
+	}
+	
+	////////////Synaptic STDP-BCM input//////////////////////////////
+	proc createInput() {	//procedure for creating a synaptic input
+	$o1 = new Exp2SynSTDP_multNNb_globBCM_intscount_precentred($2)
+	$o1.tau1 = 0.2 	//ms
+	$o1.tau2 = 2.5 	//ms
+	$o1.e = 0	//mV
+	$o1.ptau = PTAU	//time constant for potentiation
+	$o1.dtau = DTAU	//time constant for depression
+	$o1.start = 0
+	$o1.wMax = 1	//hard bound
+	//setting the pointers to link synaptic input with the BCM
+	setpointer $o1.d, d_BCMthreshold	
+	setpointer $o1.p, p_BCMthreshold
+	}
+	
+	objref stim, syn, syncon //objects for spike generator, synapse, synaptic connection
+	objref stim
+	stim = new NetStim(0.5)
+	stim.start = 0	//ms this is better - avoids epsps at t=0 ms
+	stim.number = 1e9 	
+	stim.interval = 10	//ms
+	stim.noise = 1
+	cell {
+		createInput(syn, 0.5)
+		syncon = new NetCon(stim, syn, 0, 0, 0.001)	//connecting stim with syn and setting the threshold, delay and weight of the connection
+	}
+	
+	xopen("v_alphascount_weight.ses")	//loading the session file to plot the voltage, integrated spike count and synaptic weight
